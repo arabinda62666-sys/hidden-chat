@@ -1,0 +1,6 @@
+{
+  "name": "Calculator",
+  "description": "Stealth private messaging app disguised as a precision calculator with end-to-end privacy, custom vault unlock, interactive chats, AI assistance, calls, media gallery, and privacy controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
