@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SecuritySettings, AuthUser } from '../types';
+import { GeminiApiKeyModal } from './GeminiApiKeyModal';
 
 interface SettingsViewProps {
   settings: SecuritySettings;
@@ -21,6 +22,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onLogout,
 }) => {
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showGeminiModal, setShowGeminiModal] = useState(false);
+  const [geminiKey, setGeminiKey] = useState<string>(
+    () => localStorage.getItem('gemini_api_key') || ''
+  );
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -108,6 +113,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span className="text-[9px] uppercase tracking-wider">Sign Out</span>
           </button>
         )}
+      </section>
+
+      {/* Gemini AI Settings Card */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] text-[#d4af37] px-1 uppercase tracking-[0.2em] font-semibold">
+          AI & Intelligence Configuration
+        </h3>
+        <div className="bg-[#0a0a0a] rounded-2xl p-3.5 border border-[#d4af37]/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#d4af37]/10 border border-[#d4af37]/30 flex items-center justify-center text-[#d4af37]">
+              <span className="material-symbols-outlined text-[22px]">smart_toy</span>
+            </div>
+            <div>
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <span>Gemini API Key</span>
+                {geminiKey ? (
+                  <span className="bg-emerald-500/20 text-emerald-400 text-[9px] font-mono px-1.5 py-0.5 rounded font-bold">
+                    ACTIVE
+                  </span>
+                ) : (
+                  <span className="bg-amber-500/20 text-amber-400 text-[9px] font-mono px-1.5 py-0.5 rounded font-bold">
+                    NOT SET
+                  </span>
+                )}
+              </h4>
+              <p className="text-xs text-white/50 font-light">
+                {geminiKey ? '•••' + geminiKey.slice(-6) : 'Configure API Key for AI features'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowGeminiModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-[#d4af37] text-black font-bold text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow shrink-0"
+          >
+            {geminiKey ? 'Edit Key' : 'Set Key'}
+          </button>
+        </div>
       </section>
 
       {/* Stealth & Vault Security Controls */}
@@ -312,6 +355,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Gemini API Key Modal */}
+      {showGeminiModal && (
+        <GeminiApiKeyModal
+          currentKey={geminiKey}
+          onSaveKey={(key) => {
+            setGeminiKey(key);
+            localStorage.setItem('gemini_api_key', key);
+          }}
+          onClose={() => setShowGeminiModal(false)}
+        />
       )}
     </div>
   );

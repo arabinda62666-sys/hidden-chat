@@ -30,8 +30,27 @@ import { CallScreen } from './components/CallScreen';
 import { StatusView } from './components/StatusView';
 import { SettingsView } from './components/SettingsView';
 import { BottomNav } from './components/BottomNav';
+import { GeminiApiKeyModal } from './components/GeminiApiKeyModal';
+import { testFirebaseConnection, auth, signOut, onAuthStateChanged } from './lib/firebase';
+import {
+  syncUserProfile,
+  getUserProfileFromFirestore,
+  subscribeToChatMessages,
+  sendMessageToFirestore,
+  addCallLogToFirestore,
+} from './lib/firestoreService';
+
 
 export const App: React.FC = () => {
+  const [showGeminiKeyPrompt, setShowGeminiKeyPrompt] = useState<boolean>(() => {
+    const key = localStorage.getItem('gemini_api_key');
+    const prompted = localStorage.getItem('gemini_api_key_prompted');
+    return !key && !prompted;
+  });
+
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(
+    () => localStorage.getItem('gemini_api_key') || ''
+  );
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     const saved = localStorage.getItem('calc_user');
     return saved ? JSON.parse(saved) : null;
@@ -102,7 +121,65 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Real-time Firestore Chat Sync for Active Conversation
+  useEffect(() => {
+    if (!activeContact) return;
+    const contactId = activeContact.id;
+    const unsubscribe = subscribeToChatMessages(contactId, (fbMessages) => {
+      if (fbMessages.length > 0) {
+        setMessages((prev) => {
+          const currentList = prev[contactId] || [];
+          const mergedMap = new Map<string, Message>();
+          currentList.forEach((m) => mergedMap.set(m.id, m));
+          fbMessages.forEach((m) => mergedMap.set(m.id, m));
+          return {
+            ...prev,
+            [contactId]: Array.from(mergedMap.values()),
+          };
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [activeContact]);
+
   // Persistence and backend sync effects
+  useEffect(() => {
+    testFirebaseConnection();
+  }, []);
+
+  // Firebase Auth Persistent Session Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        // Attempt to fetch existing profile from Firestore or build from fbUser
+        const existingProfile = await getUserProfileFromFirestore(fbUser.uid);
+        const user: AuthUser = existingProfile || {
+          id: fbUser.uid,
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || `User ${fbUser.phoneNumber?.slice(-4) || ''}`,
+          email: fbUser.email || undefined,
+          phone: fbUser.phoneNumber || undefined,
+          authMethod: fbUser.providerData[0]?.providerId.includes('google')
+            ? 'google'
+            : fbUser.providerData[0]?.providerId.includes('phone')
+            ? 'phone'
+            : 'email',
+          avatarUrl: fbUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
+        };
+        setCurrentUser(user);
+        localStorage.setItem('calc_user', JSON.stringify(user));
+        syncUserProfile(user);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      syncUserProfile(currentUser);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     localStorage.setItem('calcchat_contacts', JSON.stringify(contacts));
     syncVaultData({ contacts });
@@ -132,12 +209,18 @@ export const App: React.FC = () => {
     setAppMode('calculator');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Firebase signOut error:', err);
+    }
     localStorage.removeItem('calc_user');
     setCurrentUser(null);
     setActiveContact(null);
     setAppMode('login');
   };
+
 
   // Handlers
   const handleLockApp = () => {
@@ -184,6 +267,11 @@ export const App: React.FC = () => {
       ...prev,
       [contactId]: updatedList,
     }));
+
+    // Send to Firestore in background
+    sendMessageToFirestore(contactId, newMsg).catch((err) =>
+      console.warn('Failed to send message to Firestore:', err)
+    );
 
     // Update last message in contacts
     const displaySnippet = text || (attachment ? `Shared ${attachment.type}` : poll ? 'New Poll' : '');
@@ -239,6 +327,11 @@ export const App: React.FC = () => {
       duration: '00:01',
     };
     setCallLogs((prev) => [newLog, ...prev]);
+    if (currentUser?.id) {
+      addCallLogToFirestore(currentUser.id, newLog).catch((err) =>
+        console.warn('Failed to add call log to Firestore:', err)
+      );
+    }
   };
 
   const handleEndCall = () => {
@@ -404,6 +497,23 @@ export const App: React.FC = () => {
               prev ? { ...prev, isBackgroundBlurred: !prev.isBackgroundBlurred } : null
             )
           }
+        />
+      )}
+      {/* Gemini API Key Initial Setup Modal */}
+      {showGeminiKeyPrompt && (
+        <GeminiApiKeyModal
+          isFirstInstall={true}
+          currentKey={geminiApiKey}
+          onSaveKey={(key) => {
+            setGeminiApiKey(key);
+            localStorage.setItem('gemini_api_key', key);
+            localStorage.setItem('gemini_api_key_prompted', 'true');
+            setShowGeminiKeyPrompt(false);
+          }}
+          onClose={() => {
+            localStorage.setItem('gemini_api_key_prompted', 'true');
+            setShowGeminiKeyPrompt(false);
+          }}
         />
       )}
     </div>

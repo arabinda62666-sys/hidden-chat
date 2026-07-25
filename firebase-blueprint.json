@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "user": {
+      "title": "User Profile",
+      "description": "Registered user profile details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "name"]
+    },
+    "chatMessage": {
+      "title": "Chat Message",
+      "description": "Encrypted message item in conversation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "timestamp": { "type": "string" },
+        "isOutgoing": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"] }
+      },
+      "required": ["id", "senderId", "content", "timestamp"]
+    },
+    "statusStory": {
+      "title": "Status Story",
+      "description": "Ephemeral status story update",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string", "maxLength": 100 },
+        "userAvatar": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string" },
+        "mediaUrl": { "type": "string", "maxLength": 1000 },
+        "mediaType": { "type": "string", "enum": ["image", "video"] },
+        "text": { "type": "string", "maxLength": 500 },
+        "bgColor": { "type": "string", "maxLength": 30 },
+        "caption": { "type": "string", "maxLength": 300 }
+      },
+      "required": ["id", "userId", "timestamp"]
+    },
+    "callRecord": {
+      "title": "Call Log Record",
+      "description": "Call history log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "contactId": { "type": "string" },
+        "contactName": { "type": "string", "maxLength": 100 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["voice", "video"] },
+        "direction": { "type": "string", "enum": ["incoming", "outgoing", "missed"] },
+        "timestamp": { "type": "string" },
+        "duration": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/user" },
+      "description": "User profile collection"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/chatMessage" },
+      "description": "Real-time messages collection for chats"
+    },
+    "/statuses/{statusId}": {
+      "schema": { "$ref": "#/entities/statusStory" },
+      "description": "Status updates shared across users"
+    },
+    "/users/{userId}/calls/{callId}": {
+      "schema": { "$ref": "#/entities/callRecord" },
+      "description": "User call history logs"
+    }
+  }
+}

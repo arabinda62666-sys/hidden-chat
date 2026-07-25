@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusItem, AuthUser } from '../types';
+import { subscribeToStatuses, addStatusToFirestore } from '../lib/firestoreService';
 import {
   Plus,
   Camera,
@@ -95,6 +96,24 @@ export const StatusView: React.FC<StatusViewProps> = ({
     const saved = localStorage.getItem('calcchat_statuses');
     return saved ? JSON.parse(saved) : INITIAL_STATUS_UPDATES;
   });
+
+  // Real-time Firestore sync for status updates
+  useEffect(() => {
+    const unsubscribe = subscribeToStatuses((fbStatuses) => {
+      if (fbStatuses.length > 0) {
+        setStatuses((prev) => {
+          const merged = [...fbStatuses];
+          prev.forEach((p) => {
+            if (!merged.some((m) => m.id === p.id)) {
+              merged.push(p);
+            }
+          });
+          return merged;
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [myStatuses, setMyStatuses] = useState<StatusItem[]>(() => {
     const saved = localStorage.getItem('calcchat_my_statuses');
@@ -422,6 +441,9 @@ export const StatusView: React.FC<StatusViewProps> = ({
     };
 
     setMyStatuses((prev) => [newStatus, ...prev]);
+    addStatusToFirestore(newStatus).catch((err) =>
+      console.warn('Failed to publish status story to Firestore:', err)
+    );
     closeCreateModal();
   };
 
